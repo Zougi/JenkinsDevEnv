@@ -1,0 +1,76 @@
+version: '3'
+## https://docs.docker.com/compose/compose-file/
+
+services:
+
+  ## https://hub.docker.com/r/gogs/gogs/
+  ## https://github.com/gogits/gogs/tree/master/docker
+  ## docker run --name=gogs -p 10022:22 -p 10080:3000 -v /var/gogs:/data gogs/gogs
+  # gogs:
+  #   image: gogs/gogs:0.11.29
+  #   ports:
+  #     - "10022:22"
+  #     - "10080:3000"
+  #   volumes:
+  #     - ./data/gogs:/data
+
+
+  ## https://hub.docker.com/r/jenkinsci/jenkins/
+  ## https://github.com/jenkinsci/docker/blob/master/README.md
+  ## docker run -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
+  jenkins-master:
+    image: jenkinsci/jenkins:2.85
+    environment:
+      JENKINS_SLAVE_AGENT_PORT: "50000"
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - ./data/jenkins:/var/jenkins_home
+    # links:
+    #   - gogs
+    #   - nexus
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  ## https://hub.docker.com/r/jenkinsci/jnlp-slave/
+  ## docker run jenkinsci/jnlp-slave -url http://jenkins-server:port <secret> <agent name>
+  ## docker run jenkinsci/jnlp-slave -url http://jenkins-server:port -workDir=/home/jenkins/agent <secret> <agent name>
+  ## java -jar http://jenkins-master:8080/jnlpJars/agent.jar -jnlpUrl http://localhost:8080/computer/jenkins_node_jnlp/slave-agent.jnlp -secret b1bc8533596c26433dd8e20f9c7b05941a633074c9bfa2bb4ac926e81ef5f872 -workDir "/home/jenkins/agent"
+
+  ## docker command:
+  ## docker run jenkinsci/jnlp-slave -url http://jenkins-master:8080 -workDir=/home/jenkins/agent 1e1e1f793ed9596a394edb2fd21da6060e0af7fdb52f69b28681c10f759a0b49 jenkins_node_jnlp
+  jenkins-node-jnlp:
+    image: jenkinsci/jnlp-slave:latest
+    depends_on:
+      - jenkins-master
+    environment:
+      JENKINS_AGENT_NAME: jenkins_node_jnlp
+      JENKINS_URL: http://jenkins-master:8080
+      JENKINS_AGENT_WORKDIR: /home/jenkins
+      JENKINS_SECRET_FILE: /var/jenkins_master/slave.secret
+    links:
+      - jenkins-master
+      # - gogs
+      # - nexus
+    volumes:
+      - ./jenkins-slave-init:/usr/bin/jenkins-slave-init
+      - ./data/jenkins:/var/jenkins_master
+    entrypoint: /usr/bin/jenkins-slave-init
+
+  ## https://hub.docker.com/r/sonatype/nexus3/
+  ## docker run -d -p 8081:8081 --name nexus sonatype/nexus3
+  ## docker run -d -p 8081:8081 --name nexus -e NEXUS_CONTEXT=nexus sonatype/nexus3
+  ## docker run -d -p 8081:8081 --name nexus -v nexus-data:/nexus-data sonatype/nexus3
+  ## docker run -d -p 8081:8081 --name nexus -e INSTALL4J_ADD_VM_PARAMS="-Xms2g -Xmx2g -XX:MaxDirectMemorySize=3g  -Djava.util.prefs.userRoot=/some-other-dir" sonatype/nexus3
+  # nexus:
+  #   image: sonatype/nexus3:3.6.0
+  #   environment:
+  #     NEXUS_CONTEXT: /
+  #   ports:
+  #     - "8081:8081"
+  #   volumes:
+  #     - ./data/nexus-data:/nexus-data

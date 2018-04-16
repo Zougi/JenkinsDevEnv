@@ -1,0 +1,14 @@
+#!/bin/bash
+
+while [ ! -f $JENKINS_SECRET_FILE ]
+do
+  echo 'wait for slave to pop up...'
+  sleep 4
+done
+ls -l $JENKINS_SECRET_FILE
+
+JENKINS_SECRET=$(cat $JENKINS_SECRET_FILE)
+
+exec java -Dorg.jenkinsci.remoting.engine.JnlpProtocol3.disabled=true \
+ -cp /usr/share/jenkins/slave.jar hudson.remoting.jnlp.Main -headless \
+ -url $JENKINS_URL -workDir $JENKINS_AGENT_WORKDIR $JENKINS_SECRET $JENKINS_AGENT_NAME
