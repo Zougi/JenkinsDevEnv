@@ -19,7 +19,8 @@ services:
   ## https://github.com/jenkinsci/docker/blob/master/README.md
   ## docker run -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
   jenkins-master:
-    image: jenkinsci/jenkins:2.85
+    image: jenkins/jenkins:2.117
+    container_name: jenkins-master
     environment:
       JENKINS_SLAVE_AGENT_PORT: "50000"
     ports:
@@ -44,7 +45,9 @@ services:
   ## docker command:
   ## docker run jenkinsci/jnlp-slave -url http://jenkins-master:8080 -workDir=/home/jenkins/agent 1e1e1f793ed9596a394edb2fd21da6060e0af7fdb52f69b28681c10f759a0b49 jenkins_node_jnlp
   jenkins-node-jnlp:
-    image: jenkinsci/jnlp-slave:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins-slave
     depends_on:
       - jenkins-master
     environment:
@@ -60,6 +63,9 @@ services:
       - ./jenkins-slave-init:/usr/bin/jenkins-slave-init
       - ./data/jenkins:/var/jenkins_master
     entrypoint: /usr/bin/jenkins-slave-init
+    privileged: true
+    dns:
+      - 8.8.8.8
 
   ## https://hub.docker.com/r/sonatype/nexus3/
   ## docker run -d -p 8081:8081 --name nexus sonatype/nexus3

@@ -1,13 +1,61 @@
 #!/bin/bash
+##
+## Init script for jenkins slave in docker .. with docker =D
+## Author: Frederic Rousseau
+##
+
+## Start Docker (taken from dind)
+
+dockerd $DOCKER_DAEMON_ARGS &
+(( timeout = 60 + SECONDS ))
+until docker info >/dev/null 2>&1
+do
+    if (( SECONDS >= timeout )); then
+        echo 'Timed out trying to connect to internal docker host.' >&2
+        break
+    fi
+    sleep 1
+done
+
+## Change user
+
+su jenkins
+
+## Wait for Master to generate agent secret
 
 while [ ! -f $JENKINS_SECRET_FILE ]
 do
-  echo 'wait for slave to pop up...'
+  echo 'wait for init.groovy.d/create-slave.groovy to configure slave on master node...'
   sleep 4
 done
 ls -l $JENKINS_SECRET_FILE
-
 JENKINS_SECRET=$(cat $JENKINS_SECRET_FILE)
+
+## Wait for Master to be up
+
+until $(curl --output /dev/null --silent --head --fail $JENKINS_URL); do
+    echo "wait for $JENKINS_URL to be up..."
+    sleep 4
+done
+
+## Cron to reconnect slave when connection is lost
+
+cat << EOF > "$JENKINS_AGENT_WORKDIR/revive-jenkins-slave"
+\#!/bin/bash
+
+curl -s "${JENKINS_URL}/computer/${JENKINS_AGENT_NAME}/api/json" | grep -q '"offline":true'
+if [ "\$?" -eq "0" ]; then
+    echo "jenkins slave node is offline. restarting"
+    exec java -Dorg.jenkinsci.remoting.engine.JnlpProtocol3.disabled=true \
+     -cp /usr/share/jenkins/slave.jar hudson.remoting.jnlp.Main -headless \
+     -url $JENKINS_URL -workDir $JENKINS_AGENT_WORKDIR $JENKINS_SECRET $JENKINS_AGENT_NAME
+fi
+EOF
+crontab -l
+echo "*/1 * * * * bash $JENKINS_AGENT_WORKDIR/revive-jenkins-slave"
+crontab -
+
+## Connect slave
 
 exec java -Dorg.jenkinsci.remoting.engine.JnlpProtocol3.disabled=true \
  -cp /usr/share/jenkins/slave.jar hudson.remoting.jnlp.Main -headless \
