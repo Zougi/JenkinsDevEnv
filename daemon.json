@@ -1,0 +1,8 @@
+{
+  "storage-driver" : "aufs",
+  "debug" : true,
+  "dns" : [
+    "8.8.8.8"
+  ],
+  "experimental" : false
+}
