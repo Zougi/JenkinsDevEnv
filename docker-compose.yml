@@ -14,6 +14,25 @@ services:
   #   volumes:
   #     - ./data/gogs:/data
 
+  ## https://hub.docker.com/r/gogs/gogs/
+  ## https://github.com/gogits/gogs/tree/master/docker
+  ## docker run --name=gogs -p 10022:22 -p 10080:3000 -v /var/gogs:/data gogs/gogs
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    environment:
+      INFLUXDB_DB: db0
+      INFLUXDB_ADMIN_ENABLED: "true"
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: Password123
+      INFLUXDB_USER: telegraf
+      INFLUXDB_USER_PASSWORD: Password123
+    ports:
+      - "8083:8083"
+      - "8086:8086"
+      - "8090:8090"
+    volumes:
+      - ./influxdb:/var/lib/influxdb
 
   ## https://hub.docker.com/r/jenkinsci/jenkins/
   ## https://github.com/jenkinsci/docker/blob/master/README.md
@@ -27,10 +46,11 @@ services:
       - "8080:8080"
       - "50000:50000"
     volumes:
-      - ./data/jenkins:/var/jenkins_home
-    # links:
+      - ./jenkins_home:/var/jenkins_home
+    links:
     #   - gogs
     #   - nexus
+       - influxdb
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080"]
       interval: 30s
@@ -61,7 +81,7 @@ services:
       # - nexus
     volumes:
       - ./jenkins-slave-init:/usr/bin/jenkins-slave-init
-      - ./data/jenkins:/var/jenkins_master
+      - ./jenkins_home:/var/jenkins_master
     entrypoint: /usr/bin/jenkins-slave-init
     privileged: true
     dns:
